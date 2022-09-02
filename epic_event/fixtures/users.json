@@ -1,0 +1,41 @@
+[
+    {
+        "model": "users.user",
+        "pk": 1,
+        "fields": {
+            "email": "marie.bernard@management.com",
+            "password": "passwordmanagement",
+            "phone": "+33111111111",
+            "first_name": "Marie",
+            "last_name": "Bernard",
+            "date_updated": "2022-09-01",
+            "is_staff": "True"
+        }
+    },
+    {
+        "model": "users.user",
+        "pk": 2,
+        "fields": {
+            "email": "jean.dubois@sales.com",
+            "password": "passwordsales",
+            "phone": "+33222222222",
+            "first_name": "Jean",
+            "last_name": "Dubois",
+            "date_updated": "2022-09-01",
+            "department": 1
+        }
+    },
+    {
+        "model": "users.user",
+        "pk": 3,
+        "fields": {
+            "email": "anne.berger@support.com",
+            "password": "passwordsupport",
+            "phone": "+333333333",
+            "first_name": "Anne",
+            "last_name": "Berger",
+            "date_updated": "2022-09-01",
+            "department": 2
+        }
+    }
+]

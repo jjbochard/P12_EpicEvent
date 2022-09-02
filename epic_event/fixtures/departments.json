@@ -1,0 +1,16 @@
+[
+    {
+        "model": "crm.department",
+        "pk": 1,
+        "fields": {
+            "name": "Sales"
+        }
+    },
+    {
+        "model": "crm.department",
+        "pk": 2,
+        "fields": {
+            "name": "Support"
+        }
+    }
+]
