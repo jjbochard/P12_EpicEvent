@@ -10,7 +10,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=12, unique=True, blank=False, null=False)
     department = models.ForeignKey(
-        Department,
+        to=Department,
         on_delete=models.CASCADE,
         related_name="departments",
         blank=True,
@@ -25,16 +25,15 @@ class User(AbstractUser):
         return f"{self.first_name} {self.last_name}"
 
     def has_perm(self, perm, obj=None):
-        return self.department.name == "Management"
+        return self.is_staff
 
     def has_module_perms(self, app_label):
-        return self.department.name == "Management"
+        return self.is_staff
 
-    def is_manager(self):
-        return self.department_id == 1
-
+    @property
     def is_sales(self):
-        return self.department_id == 2
+        return self.department.name == "Sales"
 
+    @property
     def is_support(self):
-        return self.department_id == 4
+        return self.department.name == "Support"

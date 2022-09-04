@@ -3,9 +3,20 @@ from rest_framework.permissions import BasePermission
 
 class HasClientPermission(BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user.department and request.user.department.name == "Sales")
+        print("ok")
+        if request.method in ["POST", "PUT", "DELETE"]:
+            return bool(
+                request.user.department and request.user.department.name == "Sales"
+            )
+        if request.method == "GET":
+            return bool(
+                request.user.department
+                and request.user.department.name in ["Sales", "Support"]
+            )
+        return False
 
     def has_object_permission(self, request, view, obj):
+        print("ok")
         return bool(obj.contact.pk and obj.contact.pk == request.user.pk)
 
 
@@ -23,10 +34,13 @@ class HasEventPermission(BasePermission):
             return bool(
                 request.user.department and request.user.department.name == "Sales"
             )
-        elif request.method == "GET":
+        if request.method in ["GET", "PUT", "DELETE"]:
             return bool(
                 request.user.department and request.user.department.name == "Support"
             )
+        return False
 
     def has_object_permission(self, request, view, obj):
-        return bool(obj.contact.pk and obj.contact.pk == request.user.pk)
+        if request.method in ["GET", "PUT", "DELETE"]:
+            return bool(obj.contact.pk and obj.contact.pk == request.user.pk)
+        return False

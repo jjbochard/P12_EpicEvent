@@ -72,10 +72,10 @@ class EventSerializer(ModelSerializer):
             "date_created",
             "date_updated",
             "contract",
+            "contact",
         ]
         extra_kwargs = {
             "id": {"read_only": True},
             "date_created": {"read_only": True},
             "date_updated": {"read_only": True},
-            "contract": {"read_only": True},
         }

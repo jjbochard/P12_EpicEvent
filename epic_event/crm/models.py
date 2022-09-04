@@ -53,7 +53,7 @@ class Client(models.Model):
 class Contract(models.Model):
     is_signed = models.BooleanField(default=False)
     amount = models.FloatField()
-    payment_due = models.DateTimeField()
+    payment_due = models.DateTimeField(blank=True, null=True)
     date_created = models.DateTimeField(auto_now_add=True)
     date_updated = models.DateTimeField(auto_now_add=True)
     contact = models.ForeignKey(
@@ -76,7 +76,6 @@ class Contract(models.Model):
 
 
 class Event(models.Model):
-
     attendees = models.IntegerField(default=0)
     notes = models.TextField(null=True, blank=True)
     date = models.DateTimeField()

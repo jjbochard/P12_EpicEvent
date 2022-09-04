@@ -1,10 +1,3 @@
-from crm.models import Client, Contract, Event
-from crm.permissions import (
-    HasClientPermission,
-    HasContractPermission,
-    HasEventPermission,
-)
-from crm.serializers import ClientSerializer, ContractSerializer, EventSerializer
 from rest_framework import status
 from rest_framework.mixins import (
     CreateModelMixin,
@@ -16,6 +9,15 @@ from rest_framework.mixins import (
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from users.models import User
+
+from crm.models import Client, Contract, Event
+from crm.permissions import (
+    HasClientPermission,
+    HasContractPermission,
+    HasEventPermission,
+)
+from crm.serializers import ClientSerializer, ContractSerializer, EventSerializer
 
 
 class CustomViewset(
@@ -36,7 +38,14 @@ class ClientViewset(CustomViewset):
 
     def get_queryset(self):
         if self.request.method == "GET":
-            return Client.objects.filter(contact=self.request.user.pk)
+            if self.request.user.department.id == 1:
+                return Client.objects.filter(contact=self.request.user.pk)
+            if self.request.user.department.id == 2:
+                ids_client_user = [
+                    event.contract.client.id
+                    for event in Event.objects.filter(contact=self.request.user.pk)
+                ]
+                return Client.objects.filter(id__in=ids_client_user)
         return Client.objects.all()
 
     def create(self, request, *args, **kwargs):
@@ -54,7 +63,7 @@ class ContractViewset(CustomViewset):
     http_method_names = ["post", "get", "put", "delete"]
 
     def get_queryset(self):
-        if self.request.method == "GET":
+        if self.request.method in ["GET"]:
             return Contract.objects.filter(contact=self.request.user.pk)
         return Contract.objects.all()
 
@@ -72,16 +81,17 @@ class EventViewset(CustomViewset):
     http_method_names = ["post", "get", "put", "delete"]
 
     def get_queryset(self):
-        # if (
-        #     self.request.method != "GET"
-        #     and self.request.user.department == Department.objects.get(department="SAL")
-        # ):
-        #     return Client.objects.filter(contact=self.request.user.pk)
+        if self.request.method in ["GET"]:
+            return Event.objects.filter(contact=self.request.user.pk)
         return Event.objects.all()
 
     def create(self, request, *args, **kwargs):
         serializer = EventSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        # serializer.save(status="POTENTIAL")
+        user_qs = User.objects.filter(id=request.data["contact"])
+        if user_qs[0].department_id != 2:
+            message = "The contact must be a support contact"
+            return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
