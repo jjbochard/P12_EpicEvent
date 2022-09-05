@@ -1,6 +1,6 @@
 from django.contrib import admin, auth
 
-from .models import Client, Department
+from .models import Client, Contract, Department, Event
 
 
 def has_superuser_permission(request):
@@ -22,6 +22,8 @@ class ClientAdmin(admin.ModelAdmin):
         "mobile_phone",
         "status",
         "contact",
+        "date_created",
+        "date_updated",
     )
 
 
@@ -32,6 +34,35 @@ class DepartmentAdmin(admin.ModelAdmin):
     )
 
 
+class ContractAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "is_signed",
+        "amount",
+        "payment_due",
+        "contact",
+        "client",
+        "date_created",
+        "date_updated",
+    )
+
+
+class EventAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "is_finished",
+        "attendees",
+        "notes",
+        "date",
+        "contract",
+        "contact",
+        "date_created",
+        "date_updated",
+    )
+
+
 admin.site.register(Client, ClientAdmin)
 admin.site.register(Department, DepartmentAdmin)
+admin.site.register(Contract, ContractAdmin)
+admin.site.register(Event, EventAdmin)
 admin.site.unregister(auth.models.Group)
