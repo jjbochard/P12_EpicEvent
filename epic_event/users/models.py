@@ -29,11 +29,3 @@ class User(AbstractUser):
 
     def has_module_perms(self, app_label):
         return self.is_staff
-
-    @property
-    def is_sales(self):
-        return self.department.name == "Sales"
-
-    @property
-    def is_support(self):
-        return self.department.name == "Support"
