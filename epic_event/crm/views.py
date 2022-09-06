@@ -75,7 +75,7 @@ class ContractViewset(CustomViewset):
             ).exists():
                 serializer.save(contact=request.user)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            message = "You can only create contracts to your related users"
+            message = "You can only create contracts to your related clients"
             return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
