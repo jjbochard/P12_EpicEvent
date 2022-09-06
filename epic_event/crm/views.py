@@ -69,10 +69,15 @@ class ContractViewset(CustomViewset):
 
     def create(self, request, *args, **kwargs):
         serializer = ContractSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save(contact=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            if Client.objects.filter(
+                id=serializer.validated_data["client"].id, contact=request.user.id
+            ).exists():
+                serializer.save(contact=request.user)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            message = "You can only create contracts to your related users"
+            return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class EventViewset(CustomViewset):
