@@ -102,3 +102,17 @@ class Event(models.Model):
     def save(self, *args, **kwargs):
         self.update_date()
         return super(Event, self).save()
+
+
+class Log(models.Model):
+    action = models.CharField(max_length=255, null=True, blank=True)
+    model = models.CharField(max_length=255, null=True, blank=True)
+    field = models.CharField(max_length=255, null=True, blank=True)
+    message = models.CharField(max_length=255, null=True, blank=True)
+    date = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
