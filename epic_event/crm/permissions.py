@@ -55,7 +55,7 @@ class HasContractPermission(BasePermission):
 
 class HasEventPermission(BasePermission):
     def has_permission(self, request, view):
-        if request.method == "POST":
+        if request.method in ["POST", "DELETE"]:
             if request.user.department and request.user.department.name == "Sales":
                 return True
             make_log(
@@ -66,7 +66,7 @@ class HasEventPermission(BasePermission):
                 user=request.user,
             )
 
-        if request.method in ["GET", "PUT", "DELETE"]:
+        if request.method in ["GET", "PUT"]:
             if request.user.department and request.user.department.name == "Support":
                 return True
             make_log(
