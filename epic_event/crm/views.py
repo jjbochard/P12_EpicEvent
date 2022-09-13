@@ -44,16 +44,19 @@ class ClientViewset(CustomViewset):
         if self.request.method == "GET":
             if self.request.user.department.id == 1:
                 return Client.objects.filter(contact=self.request.user.pk)
+
             if self.request.user.department.id == 2:
                 ids_client_user = [
                     event.contract.client.id
                     for event in Event.objects.filter(contact=self.request.user.pk)
                 ]
                 return Client.objects.filter(id__in=ids_client_user)
+
         return Client.objects.all()
 
     def create(self, request, *args, **kwargs):
         serializer = ClientSerializer(data=request.data)
+
         if not serializer.is_valid():
             for key in serializer.errors.items():
                 for k in key[1]:
@@ -68,10 +71,12 @@ class ClientViewset(CustomViewset):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
+
         if not serializer.is_valid():
             for key in serializer.errors.items():
                 for k in key[1]:
                     make_log("PUT", "Client", key[0], k, request.user)
+
         return super(ClientViewset, self).update(request, *args, **kwargs)
 
 
@@ -89,12 +94,13 @@ class ContractViewset(CustomViewset):
 
     def create(self, request, *args, **kwargs):
         serializer = ContractSerializer(data=request.data)
-        if serializer.is_valid():
 
+        if serializer.is_valid():
             if Client.objects.filter(
                 id=serializer.validated_data["client"].id, contact=request.user.id
             ).exists():
                 serializer.save(contact=request.user)
+                serializer.save(is_signed=False)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
             message = "You can only create contracts to your related clients"
@@ -118,15 +124,21 @@ class ContractViewset(CustomViewset):
                 for k in key[1]:
                     make_log("PUT", "Contract", key[0], k, request.user)
 
-        if instance.is_signed:
-            message = "You can't update a signed contract"
-            make_log("PUT", "Contract", None, message, request.user)
-            return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+        if serializer.is_valid():
+            if instance.is_signed:
+                message = "You can't update a signed contract"
+                make_log("PUT", "Contract", None, message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
 
-        return super(ContractViewset, self).update(request, *args, **kwargs)
+            if (instance.is_signed is False) and (
+                serializer.validated_data["is_signed"] is True
+            ):
+                Event.objects.create(contract_id=instance.id)
+            return super(ContractViewset, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+
         if instance.is_signed:
             message = "You can't delete a signed contract"
             make_log("DELETE", "Contract", None, message, request.user)
@@ -162,6 +174,7 @@ class EventViewset(CustomViewset):
             message = "The contact must be a support contact"
             make_log("POST", "Event", "contact", message, request.user)
             return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer.save()
         return super(EventViewset, self).create(request, *args, **kwargs)
 
@@ -174,6 +187,7 @@ class EventViewset(CustomViewset):
             for key in serializer.errors.items():
                 for k in key[1]:
                     make_log("PUT", "Event", key[0], k, request.user)
+
         if instance.is_finished:
             message = "You can't update a finished event"
             make_log("PUT", "Event", None, message, request.user)
@@ -183,6 +197,7 @@ class EventViewset(CustomViewset):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+
         if instance.is_finished:
             message = "You can't delete a finished event"
             make_log("DELETE", "Event", None, message, request.user)
