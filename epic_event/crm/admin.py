@@ -1,6 +1,6 @@
 from django.contrib import admin, auth
 
-from .models import Client, Contract, Department, Event
+from .models import Client, Contract, Department, Event, Log
 
 
 def has_superuser_permission(request):
@@ -61,8 +61,21 @@ class EventAdmin(admin.ModelAdmin):
     )
 
 
+class LogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "action",
+        "model",
+        "field",
+        "message",
+        "user",
+        "date",
+    )
+
+
 admin.site.register(Client, ClientAdmin)
 admin.site.register(Department, DepartmentAdmin)
 admin.site.register(Contract, ContractAdmin)
 admin.site.register(Event, EventAdmin)
+admin.site.register(Log, LogAdmin)
 admin.site.unregister(auth.models.Group)
