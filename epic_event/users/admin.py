@@ -12,6 +12,27 @@ admin.site.has_permission = has_superuser_permission
 
 
 class UserAdmin(admin.ModelAdmin):
+    def add_view(self, request, extra_context=None):
+        print(request)
+        self.exclude = (
+            "username",
+            "last_login",
+            "groups",
+            "date_joined",
+            "user_permissions",
+        )
+        return super(UserAdmin, self).change_view(request, extra_context)
+
+    def change_view(self, request, object_id, extra_context=None):
+        self.exclude = (
+            "password",
+            "last_login",
+            "groups",
+            "date_joined",
+            "user_permissions",
+        )
+        return super(UserAdmin, self).change_view(request, object_id, extra_context)
+
     list_display = (
         "id",
         "email",
