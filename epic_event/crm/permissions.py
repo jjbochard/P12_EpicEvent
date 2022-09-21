@@ -33,6 +33,8 @@ class HasClientPermission(BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        if request.method == "GET":
+            return True
         return bool(obj.contact.pk and obj.contact.pk == request.user.pk)
 
 

@@ -41,17 +41,6 @@ class ClientViewset(CustomViewset):
     http_method_names = ["post", "get", "put", "delete"]
 
     def get_queryset(self):
-        if self.request.method == "GET":
-            if self.request.user.department.id == 1:
-                return Client.objects.filter(contact=self.request.user.pk)
-
-            if self.request.user.department.id == 2:
-                ids_client_user = [
-                    event.contract.client.id
-                    for event in Event.objects.filter(contact=self.request.user.pk)
-                ]
-                return Client.objects.filter(id__in=ids_client_user)
-
         return Client.objects.all()
 
     @transaction.atomic
