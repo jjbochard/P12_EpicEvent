@@ -1,3 +1,5 @@
+from django.db import transaction
+from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import status
 from rest_framework.mixins import (
@@ -9,7 +11,6 @@ from rest_framework.mixins import (
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from users.models import User
 
 from crm.filters import ClientFilter, ContractFilter, EventFilter
 from crm.models import Client, Contract, Event
@@ -27,7 +28,6 @@ class CustomViewset(
     CreateModelMixin,
     DestroyModelMixin,
     ListModelMixin,
-    # RetrieveModelMixin,
     UpdateModelMixin,
 ):
     pass
@@ -54,8 +54,14 @@ class ClientViewset(CustomViewset):
 
         return Client.objects.all()
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = ClientSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(status="POTENTIAL")
+            serializer.save(contact=request.user)
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if not serializer.is_valid():
             for key in serializer.errors.items():
@@ -63,10 +69,7 @@ class ClientViewset(CustomViewset):
                     make_log("POST", "Client", key[0], k, request.user)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer.save(status="POTENTIAL")
-        serializer.save(contact=request.user)
-        return super(ClientViewset, self).create(request, *args, **kwargs)
-
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
@@ -76,8 +79,20 @@ class ClientViewset(CustomViewset):
             for key in serializer.errors.items():
                 for k in key[1]:
                     make_log("PUT", "Client", key[0], k, request.user)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         return super(ClientViewset, self).update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.status == "ACTUAL":
+            message = "You can only delete potential client"
+            make_log("DELETE", "Client", None, message, request.user)
+            return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ContractViewset(CustomViewset):
@@ -92,28 +107,62 @@ class ContractViewset(CustomViewset):
             return Contract.objects.filter(contact=self.request.user.pk)
         return Contract.objects.all()
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = ContractSerializer(data=request.data)
 
+        if not serializer.is_valid():
+            for key in serializer.errors.items():
+                for k in key[1]:
+                    make_log("POST", "Contract", key[0], k, request.user)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         if serializer.is_valid():
+            client_to_create_contract = Client.objects.get(
+                id=serializer.validated_data["client"].id
+            )
+            if client_to_create_contract.contact.id != request.user.id:
+                message = "You can only create contracts to your related clients"
+                make_log("POST", "Contract", "client", message, request.user)
+                return Response(
+                    {"message": message}, status=status.HTTP_400_BAD_REQUEST
+                )
+            if client_to_create_contract.status != "ACTUAL":
+                message = "You can only create contract to a ACTUAL client"
+                make_log("POST", "Contract", "client", message, request.user)
+                return Response(
+                    {"message": message}, status=status.HTTP_400_BAD_REQUEST
+                )
+            if serializer.validated_data["is_signed"] is True:
+                message = "You have to create a not signed contract before to sign it"
+                make_log("POST", "Contract", "is_signed", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            if serializer.validated_data["amount"] <= 0:
+                message = "Amount have to be positive"
+                make_log("POST", "Contract", "amount", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            for data in serializer.validated_data:
+                if (
+                    data == "payment_due"
+                    and serializer.validated_data["payment_due"] < timezone.now()
+                ):
+                    message = "Payment date have to be superior than the date of today"
+                    make_log("POST", "Contract", "payment_due", message, request.user)
+                    return Response(
+                        {"message": message}, status=status.HTTP_403_FORBIDDEN
+                    )
+
             if Client.objects.filter(
                 id=serializer.validated_data["client"].id, contact=request.user.id
             ).exists():
                 serializer.save(contact=request.user)
-                serializer.save(is_signed=False)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-            message = "You can only create contracts to your related clients"
-            make_log("POST", "Contract", "client", message, request.user)
-            return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
-
-        for key in serializer.errors.items():
-            for k in key[1]:
-                make_log("POST", "Contract", key[0], k, request.user)
 
         return super(ContractViewset, self).create(request, *args, **kwargs)
 
-    #     return Response(serializer.data)
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
@@ -123,6 +172,7 @@ class ContractViewset(CustomViewset):
             for key in serializer.errors.items():
                 for k in key[1]:
                     make_log("PUT", "Contract", key[0], k, request.user)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         if serializer.is_valid():
             if instance.is_signed:
@@ -130,10 +180,32 @@ class ContractViewset(CustomViewset):
                 make_log("PUT", "Contract", None, message, request.user)
                 return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
 
+            if serializer.validated_data["client"] != instance.client:
+                message = "You can't modify the client of a contract"
+                make_log("PUT", "Contract", "client", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            if serializer.validated_data["amount"] <= 0:
+                message = "Amount have to be positive"
+                make_log("PUT", "Contract", "amount", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            for data in serializer.validated_data:
+                if (
+                    data == "payment_due"
+                    and serializer.validated_data["payment_due"] < timezone.now()
+                ):
+                    message = "Payment date have to be superior than the date of today"
+                    make_log("POST", "Contract", "payment_due", message, request.user)
+                    return Response(
+                        {"message": message}, status=status.HTTP_403_FORBIDDEN
+                    )
+
             if (instance.is_signed is False) and (
                 serializer.validated_data["is_signed"] is True
             ):
                 Event.objects.create(contract_id=instance.id)
+
             return super(ContractViewset, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
@@ -145,7 +217,7 @@ class ContractViewset(CustomViewset):
             return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
 
         self.perform_destroy(instance)
-        return super(ContractViewset, self).destroy(request, *args, **kwargs)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EventViewset(CustomViewset):
@@ -153,30 +225,12 @@ class EventViewset(CustomViewset):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = EventFilter
     permission_classes = [IsAuthenticated, HasEventPermission]
-    http_method_names = ["post", "get", "put", "delete"]
+    http_method_names = ["get", "put", "delete"]
 
     def get_queryset(self):
         if self.request.method in ["GET"]:
             return Event.objects.filter(contact=self.request.user.pk)
         return Event.objects.all()
-
-    def create(self, request, *args, **kwargs):
-        serializer = EventSerializer(data=request.data)
-
-        if not serializer.is_valid():
-            for key in serializer.errors.items():
-                for k in key[1]:
-                    make_log("POST", "Event", key[0], k, request.user)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        user_qs = User.objects.filter(id=request.data["contact"])
-        if user_qs[0].department_id != 2:
-            message = "The contact must be a support contact"
-            make_log("POST", "Event", "contact", message, request.user)
-            return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer.save()
-        return super(EventViewset, self).create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -187,13 +241,35 @@ class EventViewset(CustomViewset):
             for key in serializer.errors.items():
                 for k in key[1]:
                     make_log("PUT", "Event", key[0], k, request.user)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         if instance.is_finished:
             message = "You can't update a finished event"
             make_log("PUT", "Event", None, message, request.user)
             return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
 
-        return super(EventViewset, self).update(request, *args, **kwargs)
+        if serializer.is_valid():
+            if serializer.validated_data["contract"] != instance.contract:
+                message = "You can't modify the contract of an event"
+                make_log("PUT", "Event", "contract", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            if serializer.validated_data["attendees"] <= 0:
+                message = "Attendees have to be positive"
+                make_log("PUT", "Event", "attendees", message, request.user)
+                return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
+
+            for data in serializer.validated_data:
+                if (
+                    data == "date"
+                    and serializer.validated_data["date"] < timezone.now()
+                ):
+                    message = "Event date have to be superior than the date of today"
+                    make_log("POST", "Event", "date", message, request.user)
+                    return Response(
+                        {"message": message}, status=status.HTTP_403_FORBIDDEN
+                    )
+            return super(EventViewset, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -204,4 +280,4 @@ class EventViewset(CustomViewset):
             return Response({"message": message}, status=status.HTTP_403_FORBIDDEN)
 
         self.perform_destroy(instance)
-        return super(EventViewset, self).destroy(request, *args, **kwargs)
+        return Response(status=status.HTTP_204_NO_CONTENT)

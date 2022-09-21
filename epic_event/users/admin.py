@@ -13,7 +13,7 @@ admin.site.has_permission = has_superuser_permission
 
 class UserAdmin(admin.ModelAdmin):
     def add_view(self, request, extra_context=None):
-        print(request)
+
         self.exclude = (
             "username",
             "last_login",

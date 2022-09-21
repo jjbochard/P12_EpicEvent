@@ -78,4 +78,5 @@ class EventSerializer(ModelSerializer):
             "id": {"read_only": True},
             "date_created": {"read_only": True},
             "date_updated": {"read_only": True},
+            "contact": {"read_only": True},
         }
